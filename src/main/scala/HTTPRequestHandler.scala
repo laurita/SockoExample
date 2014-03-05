@@ -1,45 +1,50 @@
-package org.mashupbots.socko.examples.websocket
-
-import java.text.SimpleDateFormat
-import java.util.GregorianCalendar
-
 import org.mashupbots.socko.events.HttpRequestEvent
-import org.mashupbots.socko.events.WebSocketFrameEvent
-
-import akka.actor.actorRef2Scala
 import akka.actor.Actor
 import akka.event.Logging
 
 /**
  * Web Socket processor for chatting
  */
-class ChatHandler extends Actor {
+class HTTPRequestHandler extends Actor {
   val log = Logging(context.system, this)
 
   /**
    * Process incoming events
    */
-  def receive = {
+  def receive: Receive =  {
+    case event: HttpRequestEvent =>
+      // return login HTML page to setup web sockets in the browser
+      val htmlText = buildLoginPageHTML()
+      writeHTML(event, htmlText)
+    context.stop(self)
+
+    /*
     case event: HttpRequestEvent =>
       // Return the HTML page to setup web sockets in the browser
-      writeHTML(event)
+      val htmlText = buildChatPageHTML()
+      writeHTML(event, htmlText)
       context.stop(self)
+    */
 
-    case _ => {
+    case _ =>
       log.info("received unknown message of type: ")
       context.stop(self)
-    }
+
   }
 
   /**
    * Write HTML page to setup a web socket on the browser
    */
-  private def writeHTML(ctx: HttpRequestEvent) {
+  private def writeHTML(ctx: HttpRequestEvent, htmlText: String) {
     // Send 100 continue if required
     if (ctx.request.is100ContinueExpected) {
       ctx.response.write100Continue()
     }
 
+    ctx.response.write(htmlText, "text/html; charset=UTF-8")
+  }
+
+  private def buildChatPageHTML(): String = {
     val buf = new StringBuilder()
     buf.append("<html><head><title>Socko Web Socket Example</title></head>\n")
     buf.append("<body>\n")
@@ -77,7 +82,15 @@ class ChatHandler extends Actor {
     buf.append("</body>\n")
     buf.append("</html>\n")
 
-    ctx.response.write(buf.toString, "text/html; charset=UTF-8")
+    buf.toString()
+  }
+
+  private def buildLoginPageHTML(): String = {
+    val source = scala.io.Source.fromFile("assets/index.html")
+    val lines = source.mkString
+    source.close()
+    lines
+
   }
 
 
