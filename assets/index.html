@@ -15,7 +15,6 @@
 
         socket.onmessage = function(event) {
             var object = jQuery.parseJSON(event.data);
-            alert(object);
             if (object.action == "login") {
                 var loggedIn = object.params.success;
                 if (loggedIn) {
@@ -25,7 +24,7 @@
                         var ta = document.getElementById('responseText');
                         ta.value = ta.value + '\n' + ev.data
                     }
-                    $('chatBtn').prop("disabled", false)
+                    $('#chatBtn').prop("disabled", false)
                 }
             }
 
@@ -68,7 +67,7 @@
 </form>
 <form onsubmit="return false;">
     <input type="text" name="message" value="Hello, World!"/>
-    <input id="chatBtn" type="button" value="Chat" onclick="send(this.form.message.value)" disabled/>
+    <input id="chatBtn" disabled type="button" value="Chat" onclick="send(this.form.message.value)"/>
 
     <h3>Output</h3>
     <textarea id="responseText" style="width: 500px; height:300px;"></textarea>

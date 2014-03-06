@@ -1,11 +1,14 @@
+import akka.util.Timeout
 import java.text.SimpleDateFormat
 import java.util.GregorianCalendar
 import org.mashupbots.socko.events.WebSocketFrameEvent
-import akka.actor.{ActorLogging, Actor}
+import akka.actor.{Props, ActorLogging, Actor}
 import scala.concurrent._
 import duration._
 import ExecutionContext.Implicits._
 import scala.util.parsing.json.JSON
+import akka.pattern.ask
+import akka.util.Timeout
 
 case class Push(text: String)
 
@@ -16,26 +19,28 @@ class WebSocketRequestHandler(webSocketId: String) extends Actor with ActorLoggi
 
   log.info("WebSocketRequestHandler created")
 
-  override def receive = notLoggedIn()
+  override def receive = notLoggedIn
 
-  def notLoggedIn(): Receive = {
+  def notLoggedIn: Receive = {
     case event: WebSocketFrameEvent =>
-      // TODO: 1. parse JSON from response
-      val jsonString = event.readText()
-      val json: Option[Any] = JSON.parseFull(jsonString)
-      val map: Map[String,Any] = json.get.asInstanceOf[Map[String, Any]]
-      val username = map.get("username").toString
-      log.info("got "+ jsonString)
-      // TODO: 2. login remotely
+      // get JSON from response data
+      val jsonStr = event.readText()
 
+      // login remotely, get response
+      implicit val timeout = Timeout(3.seconds)
+      val successF = context.system.actorOf(Props[SocketWriter]) ? Login(jsonStr)
+      val success = Await.result(successF, 3 seconds).asInstanceOf[Boolean]
 
-      // TODO: 3. if OK, send response back
+      // if OK, send response back to WebSocketRequestHandler
+      if (success) {
+        context.become(loggedIn)
+        val jsonResString: String = "{\"action\":\"login\", \"params\": {\"success\":\"true\"}}"
+        ChatApp.webServer.webSocketConnections.writeText(jsonResString, webSocketId)
+      }
 
-      val jsonResString: String = "{\"action\":\"login\", \"params\": {\"success\":\"true\"}}"
-      ChatApp.webServer.webSocketConnections.writeText(jsonResString, webSocketId)
   }
 
-  def loggedIn(): Receive = {
+  def loggedIn: Receive = {
 
       /*
       case Push(text) =>
@@ -45,6 +50,8 @@ class WebSocketRequestHandler(webSocketId: String) extends Actor with ActorLoggi
 
       case event: WebSocketFrameEvent =>
         // Echo web socket text frames
+
+
         writeWebSocketResponse(event)
       //context.stop(self)
   }
@@ -70,6 +77,19 @@ class WebSocketRequestHandler(webSocketId: String) extends Actor with ActorLoggi
     val ts = dateFormatter.format(time.getTime)
 
     ChatApp.webServer.webSocketConnections.writeText(ts + " " + event.readText)
+  }
+
+  private def getUsernameFromJSON(event: WebSocketFrameEvent): String = {
+    var username = try {
+      val jsonString = event.readText()
+      val json: Option[Any] = JSON.parseFull(jsonString)
+      val map: Map[String,Any] = json.get.asInstanceOf[Map[String, Any]]
+      map.get("username").toString
+    } catch {
+      case e => ""
+
+    }
+    username
   }
 
 }

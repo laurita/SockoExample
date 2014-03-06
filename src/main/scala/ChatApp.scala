@@ -1,11 +1,23 @@
+import java.io._
+import java.net.Socket
 import org.mashupbots.socko.events.HttpResponseStatus
 import org.mashupbots.socko.infrastructure.Logger
 import org.mashupbots.socko.routes._
 import org.mashupbots.socko.webserver.WebServer
 import org.mashupbots.socko.webserver.WebServerConfig
 import akka.actor.{PoisonPill, ActorSystem, Props, actorRef2Scala}
+import scala.Some
 
 object ChatApp extends Logger {
+
+  val host = "localhost"
+  val port = 4567
+
+  val socket = new Socket(host, port)
+
+  val out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream))
+  val in = new DataInputStream(new BufferedInputStream(socket.getInputStream))
+  val stdIn = new BufferedReader(new InputStreamReader(System.in))
 
   val actorSystem = ActorSystem("ChatExampleActorSystem")
 
@@ -30,7 +42,7 @@ object ChatApp extends Logger {
           onClose = Some(onWebSocketClose))
 
         val webSocketId = wsHandshake.webSocketId
-        val webSocketRequestHandler = actorSystem.actorOf(Props(new WebSocketRequestHandler(webSocketId)), name="webSocketRequestHandler")
+        val webSocketRequestHandler = actorSystem.actorOf(Props(new WebSocketRequestHandler(webSocketId)), name=webSocketId)
         //webSocketRequestHandler ! Push("foo")
 
 
@@ -38,9 +50,10 @@ object ChatApp extends Logger {
 
     case WebSocketFrame(wsFrame) =>
 
-      log.info("got WebSocketFrame"+ wsFrame)
+      log.info("got WebSocketFrame "+ wsFrame)
 
-      val wsrh = actorSystem.actorSelection("user/webSocketRequestHandler")
+      val webSocketId = wsFrame.webSocketId
+      val wsrh = actorSystem.actorSelection(s"user/$webSocketId")
 
       log.info("found WebSocketRequestHandler: "+ wsrh)
       wsrh ! wsFrame
@@ -52,7 +65,7 @@ object ChatApp extends Logger {
 
   def main(args: Array[String]) {
     Runtime.getRuntime.addShutdownHook(new Thread {
-      override def run { webServer.stop() }
+      override def run() { webServer.stop() }
     })
     webServer.start()
 
