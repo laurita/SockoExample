@@ -21,8 +21,16 @@
                     var ta = document.getElementById('responseText');
                     ta.value = ta.value + '\n' + "You are logged in!"
                     socket.onmessage = function(ev) {
-                        var ta = document.getElementById('responseText');
-                        ta.value = ta.value + '\n' + ev.data
+                        var object = jQuery.parseJSON(event.data);
+
+                        if (object.action == "send") {
+                            var sender = object.params.name;
+                            var message = object.params.message;
+                            var ta = document.getElementById('responseText');
+                            ta.value = ta.value + '\n' + sender + ": " + message
+                        }
+
+
                     }
                     $('#chatBtn').prop("disabled", false)
                 }
@@ -52,9 +60,11 @@
     }
  
     function send(message) {
+
+        var objectStr = JSON.stringify({action: "send", params: {message: message}})
         if (!window.WebSocket) { return; }
         if (socket.readyState == WebSocket.OPEN) {
-            socket.send(message);
+            socket.send(objectStr);
         } else {
             alert("The socket is not open.");
         }
