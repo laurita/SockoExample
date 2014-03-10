@@ -44,6 +44,7 @@ class HTTPRequestHandler extends Actor {
     ctx.response.write(htmlText, "text/html; charset=UTF-8")
   }
 
+  /*
   private def buildChatPageHTML(): String = {
     val buf = new StringBuilder()
     buf.append("<html><head><title>Socko Web Socket Example</title></head>\n")
@@ -84,6 +85,7 @@ class HTTPRequestHandler extends Actor {
 
     buf.toString()
   }
+  */
 
   private def buildLoginPageHTML(): String = {
     val source = scala.io.Source.fromFile("assets/index.html")

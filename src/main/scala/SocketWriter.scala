@@ -1,8 +1,9 @@
 import akka.actor.{ActorLogging, Actor}
-import java.io.DataOutputStream
 import scala.util.parsing.json.JSON
 
-case class Login(jsonStr: String)
+class Message()
+case class Login(jsonStr: String) extends Message
+case class ChatMessage(jsonStr: String) extends Message
 
 class SocketWriter extends Actor with ActorLogging {
 
@@ -39,6 +40,20 @@ class SocketWriter extends Actor with ActorLogging {
 
 
     }
+
+    case ChatMessage(jsonStr) =>
+      log.info("SocketWriter got "+ jsonStr)
+
+      // make byte array from JSON string
+      val byteArray = makeByteArrayFromJSON(jsonStr)
+
+      // send byte array through socket
+      log.info("made byte array "+ byteArray.toList)
+      if (!byteArray.isEmpty) {
+        out.write(byteArray)
+        out.flush()
+      }
+
   }
 
   private def makeByteArrayFromJSON(jsonStr: String): Array[Byte] = {
@@ -65,8 +80,20 @@ class SocketWriter extends Actor with ActorLogging {
           val msgByteArray =
             Array(command) ++ intToByteArray(username.length) ++ username.getBytes("UTF-8")
           log.info("msgByteArray: "+ msgByteArray)
-
-        msgByteArray
+          msgByteArray
+        case 3 =>
+          //val username = params.get("name").get.asInstanceOf[String]
+          //log.info("username: "+ username)
+          val message = params.get("message").get.asInstanceOf[String]
+          log.info("message: "+ message)
+          /*
+          val msgByteArray =
+            Array(command) ++ intToByteArray(username.length) ++ username.getBytes("UTF-8") ++
+            intToByteArray(message.length) ++ message.getBytes("UTF-8")
+          */
+          val msgByteArray =
+            Array(command) ++ intToByteArray(message.length) ++ message.getBytes("UTF-8")
+          msgByteArray
       }
     } catch {
       case e: Exception => Array[Byte]()

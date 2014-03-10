@@ -6,7 +6,7 @@ import akka.actor.{Props, ActorLogging, Actor}
 import scala.concurrent._
 import duration._
 import ExecutionContext.Implicits._
-import scala.util.parsing.json.JSON
+import scala.util.parsing.json.{JSONObject, JSON}
 import akka.pattern.ask
 import akka.util.Timeout
 
@@ -23,6 +23,7 @@ class WebSocketRequestHandler(webSocketId: String) extends Actor with ActorLoggi
 
   def notLoggedIn: Receive = {
     case event: WebSocketFrameEvent =>
+
       // get JSON from response data
       val jsonStr = event.readText()
 
@@ -33,14 +34,22 @@ class WebSocketRequestHandler(webSocketId: String) extends Actor with ActorLoggi
 
       // if OK, send response back to WebSocketRequestHandler
       if (success) {
-        context.become(loggedIn)
+        // get username in order to change receive behavior to contain it
+        val json: Option[Any] = JSON.parseFull(jsonStr)
+        val map: Map[String,Any] = json.get.asInstanceOf[Map[String, Any]]
+        val params = map.get("params").get.asInstanceOf[Map[String, Any]]
+        val username = params.get("name").get.asInstanceOf[String]
+        // change receive behavior
+        context.become(loggedIn(username))
+        // make json string for response to browser
         val jsonResString: String = "{\"action\":\"login\", \"params\": {\"success\":\"true\"}}"
+        // respond to browser about success
         ChatApp.webServer.webSocketConnections.writeText(jsonResString, webSocketId)
       }
 
   }
 
-  def loggedIn: Receive = {
+  def loggedIn(username: String): Receive = {
 
       /*
       case Push(text) =>
@@ -49,11 +58,27 @@ class WebSocketRequestHandler(webSocketId: String) extends Actor with ActorLoggi
       */
 
       case event: WebSocketFrameEvent =>
+        // TODO: send to backend server
+        // get JSON from response data
+        val jsonStr = event.readText()
+
+        // create new JSON String that contains username
+        /*
+        val json: Option[Any] = JSON.parseFull(jsonStr)
+        val map: Map[String,Any] = json.get.asInstanceOf[Map[String, Any]]
+        val params = map.get("params").get.asInstanceOf[Map[String, Any]]
+        val newMap = map + ("params" -> (params + ("name" -> username)))
+        log.info("newMap with username: "+ newMap)
+        val newJSON = new JSONObject(newMap)
+        val newJSONStr = newJSON.toString()
+        */
+        // send JSON String with username to socket writer
+        //context.system.actorOf(Props[SocketWriter]) ! ChatMessage(newJSONStr)
+
+        context.system.actorOf(Props[SocketWriter]) ! ChatMessage(jsonStr)
         // Echo web socket text frames
-
-
-        writeWebSocketResponse(event)
-      //context.stop(self)
+        //writeWebSocketResponse(event)
+        //context.stop(self)
   }
 
   /**
@@ -80,14 +105,15 @@ class WebSocketRequestHandler(webSocketId: String) extends Actor with ActorLoggi
   }
 
   private def getUsernameFromJSON(event: WebSocketFrameEvent): String = {
-    var username = try {
+    val username: String = try {
       val jsonString = event.readText()
       val json: Option[Any] = JSON.parseFull(jsonString)
       val map: Map[String,Any] = json.get.asInstanceOf[Map[String, Any]]
       map.get("username").toString
     } catch {
-      case e => ""
-
+      case e: Exception =>
+        e.printStackTrace()
+        throw e
     }
     username
   }

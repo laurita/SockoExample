@@ -21,6 +21,8 @@ object ChatApp extends Logger {
 
   val actorSystem = ActorSystem("ChatExampleActorSystem")
 
+  actorSystem.actorOf(Props(new SocketListener(in)), name=s"socketListener") ! ListenForChatMessages
+
   val routes = Routes({
 
     case HttpRequest(httpRequest) => httpRequest match {
@@ -28,7 +30,7 @@ object ChatApp extends Logger {
         // Return HTML page to establish web socket
         actorSystem.actorOf(Props[HTTPRequestHandler]) ! httpRequest
 
-      case Path("/favicon.ico") =>
+      case _ =>
         // If favicon.ico, just return a 404 because we don't have that file
         httpRequest.response.write(HttpResponseStatus.NOT_FOUND)
 
@@ -41,11 +43,7 @@ object ChatApp extends Logger {
           onComplete = Some(onWebSocketHandshakeComplete),
           onClose = Some(onWebSocketClose))
 
-        val webSocketId = wsHandshake.webSocketId
-        val webSocketRequestHandler = actorSystem.actorOf(Props(new WebSocketRequestHandler(webSocketId)), name=webSocketId)
         //webSocketRequestHandler ! Push("foo")
-
-
     }
 
     case WebSocketFrame(wsFrame) =>
@@ -53,7 +51,7 @@ object ChatApp extends Logger {
       log.info("got WebSocketFrame "+ wsFrame)
 
       val webSocketId = wsFrame.webSocketId
-      val wsrh = actorSystem.actorSelection(s"user/$webSocketId")
+      val wsrh = actorSystem.actorSelection(s"user/socketRequestHandler$webSocketId")
 
       log.info("found WebSocketRequestHandler: "+ wsrh)
       wsrh ! wsFrame
@@ -73,12 +71,15 @@ object ChatApp extends Logger {
   }
 
   def onWebSocketHandshakeComplete(webSocketId: String) {
+    //val webSocketId = wsHandshake.webSocketId
+    actorSystem.actorOf(Props(new WebSocketRequestHandler(webSocketId)), name=s"socketRequestHandler$webSocketId")
+    //actorSystem.actorOf(Props[SocketListener], name=s"socketListener$webSocketId")
     System.out.println(s"Web Socket $webSocketId connected")
   }
 
   def onWebSocketClose(webSocketId: String) {
     System.out.println(s"Web Socket $webSocketId closed")
-    actorSystem.actorSelection("user/fooHandler") ! PoisonPill
+    actorSystem.actorSelection(s"user/$webSocketId") ! PoisonPill
   }
 
 }
